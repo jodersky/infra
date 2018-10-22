@@ -4,8 +4,8 @@
 #
 # https://git.zx2c4.com/cgit/tree/cgitrc.5.txt
 
-favicon=/crashbox.png
-logo=/crashbox.png
+favicon=/crashbox.svg
+logo=/crashbox.svg
 root-title=git.crashbox.io
 root-desc=Git repositories hosted at crashbox.io
 root-readme=/var/lib/git/www/about.md
