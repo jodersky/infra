@@ -1,0 +1,7 @@
+#!/bin/bash
+mapfile -t lines < /etc/gh-mirror
+
+for line in "${lines[@]}"; do
+    read -r type name dir <<< "$line"
+    gh-mirror "$type" "$name" "$dir"
+done

@@ -1,0 +1,38 @@
+Source: crashbox-config
+Section: admin
+Priority: optional
+Maintainer: Jakob Odersky <infra@crashbox.io>
+Build-Depends: debhelper (>= 11)
+Standards-Version: 4.1.3
+
+Package: crashbox-base-config
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, apt-listchanges, ca-certificates, curl, jq, openssl, rsync, ufw, unattended-upgrades, wget, sudo
+Provides: ${diverted-files}
+Conflicts: ${diverted-files}
+Description: configuration for base system
+ Adds local customizations to the base system configuration.
+
+Package: crashbox-nginx-config
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ssl-cert, nginx, crashbox-base-config
+Provides: ${diverted-files}
+Conflicts: ${diverted-files}
+Description: local nginx configuration
+ Adds local customizations to nginx config
+
+Package: crashbox-ip-config
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, crashbox-nginx-config
+Provides: ${diverted-files}
+Conflicts: ${diverted-files}
+Description: what-is-my-ip website
+ Adds an nginx site that echoes back a remote IP address
+
+Package: crashbox-git-config
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, crashbox-nginx-config, cgit, python3-pygments, python3-markdown, git-core, fcgiwrap, adduser
+Provides: ${diverted-files}
+Conflicts: ${diverted-files}
+Description: cgit web interface
+ Adds an nginx site that serves a CGit instance

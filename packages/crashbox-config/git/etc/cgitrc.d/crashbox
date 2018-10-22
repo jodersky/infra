@@ -1,0 +1,63 @@
+#
+# cgit config
+# see cgitrc(5) for details
+#
+# https://git.zx2c4.com/cgit/tree/cgitrc.5.txt
+
+favicon=/crashbox.png
+logo=/crashbox.png
+root-title=git.crashbox.io
+root-desc=Git repositories hosted at crashbox.io
+root-readme=/var/lib/git/www/about.md
+clone-url=https://git.crashbox.io/$CGIT_REPO_URL
+
+## List of common mimetypes
+mimetype.gif=image/gif
+mimetype.html=text/html
+mimetype.jpg=image/jpeg
+mimetype.jpeg=image/jpeg
+mimetype.pdf=application/pdf
+mimetype.png=image/png
+mimetype.svg=image/svg+xml
+mimetype-file=/etc/mime.types
+
+# Don't show owner on index page
+enable-index-owner=0
+
+# Enable blame page and create links to it from tree page
+enable-blame=1
+
+# Enable ASCII art commit history graph on the log pages
+enable-commit-graph=1
+
+# Show extra links for each repository on the index page
+enable-index-links=1
+
+# Show number of affected files per commit on the log pages
+enable-log-filecount=1
+
+# Show number of added/removed lines per commit on the log pages
+enable-log-linecount=1
+
+# Allow download of tar.gz, tar.bz2 and zip-files
+snapshots=tar.gz tar.bz2 zip
+
+# Highlight code
+source-filter=/usr/lib/cgit/filters/syntax-highlighting.py
+
+# Format "about" files such as markdown readmes
+about-filter=/usr/lib/cgit/filters/about-formatting.sh
+readme=master:README.md
+
+# nginx handles negotiating git clones
+enable-http-clone=0
+
+section-from-path=-1
+
+# Remove ".git" suffix in listings
+remove-suffix=1
+
+# Base URL
+virtual-root=/
+
+scan-path=/srv/git

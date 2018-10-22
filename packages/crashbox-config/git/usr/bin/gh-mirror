@@ -1,0 +1,59 @@
+#!/bin/bash
+# Mirror repositories from GitHub
+#
+# Arguments: (users|orgs) <name> <output_directory>
+#
+# Clones (or updates) all repositories of a GitHub user or
+# organization. Repositories are created as children of the given
+# output directory.
+#
+# Example:
+#  gh-mirror users jodersky mirrors/github/jodersky
+#
+# This script uses GitHub's API, version 3
+# https://developer.github.com/v3/repos/#list-user-repositories
+set -o errexit
+
+account_type="$1"
+account_name="$2"
+out_dir="${3:-.}"
+mkdir -p "$out_dir"
+
+if [[ -z $account_type ]] || [[ -z $account_name ]]; then
+    echo "Usage: (users|orgs) <name> <output_directory>" >&2
+    exit 1
+fi
+
+tmp="$(mktemp /tmp/mirror-XXXXXXXXXXXX)"
+url="https://api.github.com/$account_type/$account_name/repos?per_page=100"
+
+function finish {
+    echo "An error was encountered." >&2
+    echo "curl headers are saved in $tmp" >&2
+}
+trap finish ERR
+
+while [[ ! -z "$url" ]]; do
+    echo "Fetching $url..." >&2
+
+    mapfile -t repo_data < <(curl --dump-header "$tmp" "$url" | jq --compact-output '.[]')
+    url="$(< "$tmp" grep Link | grep -oE "[a-zA-Z0-9:/?=.&_]*>; rel=.next" | cut -d'>' -f1)"
+
+    for repo in "${repo_data[@]}"; do
+	clone_url="$(echo "$repo" | jq -r .clone_url)"
+	project="$(basename "$clone_url")"
+	description=$(echo "$repo" | jq -r .description)
+
+	git_dir="$out_dir/$project"
+
+	if [ -d "$git_dir" ]; then
+	    echo "updating $project" >&2
+	    git -C "$git_dir" fetch --prune
+	else
+	    echo "mirroring new $project" >&2
+	    git clone --mirror "$clone_url" "$git_dir"
+	fi
+	echo "$description" > "$git_dir/description"
+    done
+done
+rm "$tmp"

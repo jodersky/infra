@@ -1,0 +1,3 @@
+git/etc/* etc
+git/usr/* usr
+git/var/* var
