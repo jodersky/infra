@@ -44,7 +44,7 @@ module "roles" {
   source                  = "./role"
   secret_cloudflare_token = "${var.secret_cloudflare_token}"
   host                    = "${module.vps.fqdn}"
-  id                      = "${module.volume.server_id}"
+  id                      = "${module.vps.id}"
   roles                   = ["ip", "git"]
 }
 

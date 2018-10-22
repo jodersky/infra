@@ -64,5 +64,5 @@ EOF
 }
 
 output "server_id" {
-  value = "${var.server_id}"
+  value = "${null_resource.volume_mount.triggers.server_id}"
 }

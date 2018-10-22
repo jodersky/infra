@@ -7,7 +7,7 @@ abort() {
 
 rootdir="$1"
 
-# avoid messing with host system
+# avoid messing with host system, in case this script is run by accident
 [[ -n $rootdir ]] || abort "root directory is not set"
 
 # set up local apt archive
