@@ -5,7 +5,7 @@ This project combines [terraform](https://www.terraform.io) with
 manage infrastructure automatically.
 
 It has a very opinionated structure, ideal for managing a small amount
-of (personal) servers.
+of servers.
 
 It is used to manage the crashbox.io services.
 
@@ -29,7 +29,7 @@ a server and create a CNAME to the server's A record.**
 
 For example, assigning the `ip` role to server `server.crashbox.io` will:
 
-1. Create the server and A record if it isn't already there.
+1. Create the server and A record if it doesn't already exist.
 2. Install the package `crashbox-ip-config` on the server.
 3. Create a DNS CNAME, aliasing `ip.crashbox.io` to `server.crashbox.io`.
 
@@ -40,9 +40,7 @@ installed and configure it to serve an ip address echo website.
 
 - Provisioning scripts are in `terraform/`.
 
-- Configuration package sources are in `packages/`. Note that for a
-  given role `<role>`, the corresponding debian package is
-  `crasbox-<role>-config`.
+- Configuration package sources are in `packages/`.
 
 ## Running
 
@@ -52,16 +50,14 @@ Before infrastructure configuration can be automated, a couple of
 bootstrapping steps need to be performed manually:
 
 0. Create accounts for the various providers specified in the
-terraform configuration.
+   terraform configuration.
 
 1. Provision a storage space for the terraform state file.
 
 2. Install dependencies for this project:
-   - make
-   - debhelper
-   - debuild
-   - terraform
    - pass
+   - terraform
+   See notes in `packages/` for additional dependencies.
 
 ### Apply
 
@@ -71,7 +67,8 @@ Run `make` to apply configuration.
 
 This project uses debian packages for stronger consistency guarantees
 when removing packages. Nevertheless, it is recommended to completely
-reprovision a server if a role is removed.
+reprovision a server if a role is removed. (It isn't necessary to
+reprovision if a role is added.)
 
 Keeping in mind that the goal of this project is to automate
 deployments, regular reprovisions are encouraged.
