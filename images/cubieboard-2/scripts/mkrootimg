@@ -1,0 +1,96 @@
+#!/bin/bash
+set -e
+
+print_usage() {
+    cat 1>&2 <<EOF
+Usage: $0 <rootfs_directory> <image_file>
+Package the contents of a debian root filesystem into a binary image file, ready to be burned onto an sd card.
+
+This script will create an image with a single root partition.
+EOF
+}
+
+fail() {
+    echo "$1" >&2
+    exit 1
+}
+
+log() {
+    echo "mkrootimg: $1" >&2
+}
+
+# Directory to package
+rootfs="$1"
+
+# Binary image file
+image="$2"
+
+# Contains temporary build files
+builddir=$(mktemp -d)
+
+([ -n "$rootfs" ] && [ -n "$image" ]) || fail "$(print_usage)"
+[ -d "$rootfs" ] || fail "$rootfs does not exist or is not a directory"
+
+[ "$EUID" -eq 0 ] || fail "$0 must be run as root"
+
+cleanup() {
+    set +e
+    umount --lazy "$builddir/mount" 2> /dev/null
+    sync
+    losetup --detach "$rootfs_loop" 2> /dev/null
+    rm -rf "$builddir"
+    trap - 0 1 2 3 6
+}
+trap cleanup 0 1 2 3 6
+
+# Partition layout
+#
+# Content  Size
+# ---------------------------------------------
+# reserved 1024k       (1M, for e.g. a bootloader)
+# rootfs   as required
+
+# size in bytes
+reserved_size=$((1024*1024))
+rootfs_raw_size=$(du --block-size=1 -s "$rootfs" | awk '{ print $1 }')
+# as overhead for journaling and reserved blocks, 25% is added
+rootfs_size=$(( rootfs_raw_size + rootfs_raw_size * 25 / 100 ))
+image_size=$(( reserved_size + rootfs_size + 1))
+
+# create empty image file
+log "creating empty image"
+rm -rf  "$image"
+truncate -s "$image_size" "$image"
+# round up 4096-byte sector size to avoid rounding errors
+truncate -s %4096 "$image"
+
+# write partition table to image
+parted "$image" --script mklabel msdos
+parted "$image" --script mkpart primary ext4 "$reserved_size"B $(( reserved_size + rootfs_size ))B
+
+# set up temporary loop devices
+log "setting up image loop devices"
+rootfs_loop=$(losetup \
+		  --offset "$reserved_size" \
+		  --sizelimit "$rootfs_size" \
+		  --find \
+		  --show \
+		  "$image")
+
+# format partitions
+log "formatting partitions"
+mkfs.ext4 -O^64bit "$rootfs_loop" &> /dev/null
+
+# mount partitions
+log "mounting partitions"
+mkdir -p "$builddir/mount"
+mount "$rootfs_loop" "$builddir/mount"
+
+# copy root filesystem to image
+log "copying root filesystem"
+rsync -a "$rootfs/" "$builddir/mount/"
+
+log "cleaning up"
+cleanup
+
+log "done"

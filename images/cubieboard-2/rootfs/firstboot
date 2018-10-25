@@ -1,0 +1,42 @@
+#!/bin/bash
+set -e
+echo "first boot: starting"
+
+echo "first boot: generating ssh host keys"
+systemctl stop sshd
+rm -f /etc/ssh/ssh_host_*
+ssh-keygen -q -t rsa -N "" -f /etc/ssh/ssh_host_rsa_key
+ssh-keygen -q -t dsa -N "" -f /etc/ssh/ssh_host_dsa_key
+ssh-keygen -q -t ecdsa -N "" -f /etc/ssh/ssh_host_ecdsa_key
+ssh-keygen -q -t ed25519 -N "" -f /etc/ssh/ssh_host_ed25519_key
+systemctl start sshd
+
+echo "first boot: generating dbus machine-id"
+rm -f /var/lib/dbus/machine-id 
+dbus-uuidgen --ensure
+
+echo "first boot: expanding root file system"
+fdisk /dev/mmcblk0 <<EOF || true
+p
+d
+1
+n
+p
+1
+
+
+n
+w
+EOF
+partprobe
+resize2fs /dev/mmcblk0p1
+
+echo "first boot: generating initramfs"
+update-initramfs -u
+
+echo "first boot: deleting script"
+rm -f /etc/firstboot
+sed -i '/.*firstboot/d' /etc/rc.local
+
+echo "first boot: finished"
+reboot

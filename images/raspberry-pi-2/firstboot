@@ -1,0 +1,82 @@
+#!/bin/bash
+set -e
+echo "first boot: starting"
+
+led_blink() {
+    local led=/sys/class/leds/"$1"
+
+    local time_on="$2"
+    local time_off="$time_on"
+    local blinks="$3"
+
+    local trigger=$(cat "$led/trigger" | sed 's/.*\[\(.*\)\].*/\1/g' -)
+    local brightness=$(cat "$led/brightness")
+
+    echo "none" > "$led/trigger"
+    for i in $(seq 1 $blinks); do
+        echo 255 > "$led/brightness"
+        sleep "$time_on"
+	echo 0 > "$led/brightness"
+        sleep "$time_off"
+    done
+    echo "$brightness" > "$led/brightness"
+    echo "$trigger" > "$led/trigger"
+}
+
+led_trigger() {
+    local led=/sys/class/leds/"$1"
+
+    if [ "$2" == "heartbeat" ]; then
+        modprobe ledtrig_heartbeat || true
+    fi
+    echo "$2" > "$led/trigger"
+}
+
+echo "first boot: starting led trigger"
+led_blink ACT 0.1 20 &
+led_blink PWR 0.1 20
+led_trigger PWR heartbeat
+led_trigger ACT mmc0
+
+echo "first boot: generating ssh host keys"
+systemctl stop sshd
+rm -f /etc/ssh/ssh_host_*
+ssh-keygen -q -t rsa -N "" -f /etc/ssh/ssh_host_rsa_key
+ssh-keygen -q -t dsa -N "" -f /etc/ssh/ssh_host_dsa_key
+ssh-keygen -q -t ecdsa -N "" -f /etc/ssh/ssh_host_ecdsa_key
+ssh-keygen -q -t ed25519 -N "" -f /etc/ssh/ssh_host_ed25519_key
+systemctl start sshd
+
+echo "first boot: generating dbus machine-id"
+rm -f /var/lib/dbus/machine-id 
+dbus-uuidgen --ensure
+
+echo "first boot: expanding root file system"
+fdisk /dev/mmcblk0 <<EOF || true
+p
+d
+2
+n
+p
+2
+
+
+n
+w
+EOF
+partprobe
+resize2fs /dev/mmcblk0p2
+
+echo "first boot: generating initramfs"
+update-initramfs -u
+
+echo "first boot: deleting script"
+rm -f /etc/firstboot
+sed -i '/.*firstboot/d' /etc/rc.local
+
+echo "first boot: stopping led trigger"
+led_trigger ACT heartbeat
+led_trigger PWR none
+
+echo "first boot: finished"
+reboot

@@ -1,0 +1,107 @@
+#!/bin/bash
+set -e
+
+print_usage() {
+    cat 1>&2 <<EOF
+Usage: $0 <rootfs_directory> <image_file>
+Package the contents of a debian root filesystem into a binary image file, ready to be burned onto an sd card.
+
+This script will create an image with two partitions, the first one for /boot/firmware and the second one for /.
+EOF
+}
+
+fail() {
+    echo "$1" >&2
+    exit 1
+}
+
+log() {
+    echo "mkrootimg: $1" >&2
+}
+
+# Directory to package
+rootfs="$1"
+
+# Binary image file
+image="$2"
+
+# Contains temporary build files
+builddir=$(mktemp -d)
+
+([ -n "$rootfs" ] && [ -n "$image" ]) || fail "$(print_usage)"
+[ -d "$rootfs" ] || fail "$rootfs does not exist or is not a directory"
+
+[ "$EUID" -eq 0 ] || fail "$0 must be run as root"
+
+cleanup() {
+    set +e
+    umount --lazy "$builddir/mount/boot/firmware" 2> /dev/null
+    umount --lazy "$builddir/mount" 2> /dev/null
+    sync
+    losetup --detach "$bootfs_loop" 2> /dev/null
+    losetup --detach "$rootfs_loop" 2> /dev/null
+    rm -rf "$builddir"
+    trap - 0 1 2 3 6
+}
+trap cleanup 0 1 2 3 6
+
+# Partition layout
+#
+# Content  Size
+# ---------------------------------------------
+# reserved 1024k       (1M, for e.g. a bootloader)
+# bootfs   100*1024k   (100M)
+# rootfs   as required
+
+# calculate minimum required space for root partition
+# (with 25% overhead for reserved blocks and journaling)
+rootfs_raw_size_min=$(du --block-size=1M -s "$rootfs" | awk '{ print $1 }')
+rootfs_size_min=$(( rootfs_raw_size_min + rootfs_raw_size_min * 25 / 100 ))
+
+# create and partition image file
+truncate --size $(( 1 + 100 + rootfs_size_min ))M "$image"
+parted "$image" --script mklabel msdos
+parted "$image" --script mkpart primary fat32 1M   100M
+parted "$image" --script mkpart primary ext4  100M 100%
+
+# get actual byte offsets of the partitions within the image
+bootfs_start=$(parted --machine --script "$image" unit B print | grep '^1:' | cut -d ':' -f 2 | sed 's/B//g')
+bootfs_size=$(parted --machine --script "$image" unit B print | grep '^1:' | cut -d ':' -f 4 | sed 's/B//g')
+rootfs_start=$(parted --machine --script "$image" unit B print | grep '^2:' | cut -d ':' -f 2 | sed 's/B//g')
+rootfs_size=$(parted --machine --script "$image" unit B print | grep '^2:' | cut -d ':' -f 4 | sed 's/B//g')
+
+# set up temporary loop devices
+log "setting up image loop devices"
+bootfs_loop=$(losetup \
+		  --offset "$bootfs_start" \
+		  --sizelimit "$bootfs_size" \
+		  --find \
+		  --show \
+		  "$image")
+rootfs_loop=$(losetup \
+		  --offset "$rootfs_start" \
+		  --sizelimit "$rootfs_size" \
+		  --find \
+		  --show \
+		  "$image")
+
+# format partitions
+log "formatting partitions"
+mkfs.vfat -F 32 "$bootfs_loop" &> /dev/null
+mkfs.ext4 -O^64bit "$rootfs_loop" &> /dev/null
+
+# mount partitions
+log "mounting partitions"
+mkdir -p "$builddir/mount"
+mount "$rootfs_loop" "$builddir/mount"
+mkdir -p "$builddir/mount/boot/firmware"
+mount "$bootfs_loop" "$builddir/mount/boot/firmware"
+
+# copy root filesystem to image
+log "copying root filesystem"
+rsync -a "$rootfs/" "$builddir/mount/"
+
+log "cleaning up"
+cleanup
+
+log "done"
