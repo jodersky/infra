@@ -87,4 +87,3 @@ dist-clean:
 	rm -rf target
 
 .PHONY: all run clean dist-clean
-# apt install devscripts build-essential lintian qemu-kvm vmdebootstrap
