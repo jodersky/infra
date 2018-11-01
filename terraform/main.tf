@@ -22,7 +22,6 @@ provider "acme" {
 
 ################################################################################
 
-# Main ssh key
 resource "hcloud_ssh_key" "root" {
   name       = "root"
   public_key = "${file("~/.ssh/id_rsa.pub")}"
@@ -32,12 +31,7 @@ module "vps" {
   source       = "./stdvps"
   location     = "nbg1"
   ssh_key_name = "${hcloud_ssh_key.root.name}"
-}
-
-module "volume" {
-  source      = "./volume"
-  server_id   = "${module.vps.id}"
-  server_fqdn = "${module.vps.fqdn}"
+  volume_name = "master"
 }
 
 module "roles" {
