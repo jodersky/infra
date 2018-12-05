@@ -1,22 +1,4 @@
-src-packages=crashbox-config
-
-all: target/archive
-
-target/build/%: %
-	mkdir --parent target/build
-	cp -rf $< $@
-	(cd $@ && debuild -us -uc)
-
-target/build/Packages.gz: $(addprefix target/build/,$(src-packages))
-	mkdir --parent target/build
-	(cd target/build && dpkg-scanpackages . | gzip -9c > Packages.gz)
-
-target/archive: target/build/Packages.gz
-	mkdir --parent $@
-	cp \
-	  --target-directory $@ \
-	  $(wildcard target/build/*.deb) \
-	  $<
+all: run
 
 # Create a base Debian image.
 #
@@ -48,7 +30,7 @@ target/snapshot.qcow2: target/base.img
           -b $(notdir $<) $@
 
 # Start a VM for testing config packages
-run: target/snapshot.qcow2 target/archive
+run: target/snapshot.qcow2
 	qemu-system-x86_64 \
 	  -enable-kvm \
 	  -machine q35,accel=kvm,kernel-irqchip=split \
@@ -62,7 +44,7 @@ run: target/snapshot.qcow2 target/archive
 	id=net0 \
           -device e1000,netdev=net0 \
 	  -virtfs local,\
-	path=target/archive,\
+	path=../provision,\
 	mount_tag=host0,\
 	security_model=mapped,\
 	id=host0 \
@@ -71,16 +53,7 @@ run: target/snapshot.qcow2 target/archive
 	  -monitor none \
 	  -serial stdio
 
-docker-base:
-	docker build --tag crashbox-config-base:latest -f Dockerfile.base .
-
-docker: $(archive)
-	docker build --tag crashbox-config .
-	docker run --tty --interactive crashbox-config
-
 clean:
-	rm -rf target/archive
-	rm -rf target/build
 	rm -rf target/snapshot.qcow2
 
 dist-clean:

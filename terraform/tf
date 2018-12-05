@@ -1,3 +1,0 @@
-#!/bin/bash
-
-exec terraform "$@" -var-file=<(pass infra/terraform)

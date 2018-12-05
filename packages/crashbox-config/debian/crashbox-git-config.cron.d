@@ -1,1 +1,0 @@
-0 0 * * * git /usr/bin/gh-mirror-all

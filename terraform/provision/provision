@@ -1,0 +1,81 @@
+#!/bin/bash
+
+panic() {
+    echo "$1" >&2
+    echo "Aborting."
+    exit 1
+}
+
+[[ $1 == "--force" ]] || panic "Must be run with --force"
+[[ $(id --user) -eq 0 ]] || panic "This script must be run as root."
+
+log() {
+    echo "provision: $1" >&2
+}
+
+log "install and configure most essential packages"
+apt-get update --quiet=2
+apt-get install --yes --quiet=2 ufw
+ufw allow 22/tcp
+ufw default deny
+ufw --force enable
+
+log "install service packages"
+apt-get install --yes --quiet=2 \
+	adduser \
+	apt-listchanges \
+	ca-certificates \
+	cgit \
+	curl \
+	fcgiwrap \
+	git-core \
+	jq \
+	nginx \
+	openssl \
+	python3-markdown \
+	python3-pygments \
+	rsync \
+	ssl-cert \
+	sudo \
+	ufw \
+	unattended-upgrades \
+	wget
+
+log "copy package configurations"
+rsync -r /usr/local/share/provision/rootfs/ /
+
+log "ensure certificate bundle exists"
+# the ceritifcate bundle should be provisioned by terraform, however
+# for testing purposes (such as in a vm) this copies the default
+# "snakeoil" test certificates to the appropriate locations if they do
+# not already exist
+if [[ ! -r /etc/ssl/private/server.key.pem ]] \
+       || [[ ! -r /etc/ssl/server.cert.pem ]] \
+       || [[ ! -r /etc/ssl/issuer.cert.pem ]]; then
+    ln -f -s /etc/ssl/private/ssl-cert-snakeoil.key /etc/ssl/private/server.key.pem
+    ln -f -s /etc/ssl/certs/ssl-cert-snakeoil.pem /etc/ssl/server.cert.pem
+    ln -f -s /etc/ssl/certs/ssl-cert-snakeoil.pem /etc/ssl/issuer.cert.pem
+    log "WARNING: no certificates found, falling back to snakeoil certificates!"
+fi
+
+log "configure nginx"
+rm -r /etc/nginx/sites-enabled/default
+usermod --append --groups ssl-cert www-data
+ufw allow 80/tcp
+ufw allow 443/tcp
+
+log "configure git"
+adduser --group --system --home /var/lib/git git
+mkdir -p /srv/git
+chown -R git:git /srv/git
+mkdir -p /var/lib/git/www/
+ln -s /usr/share/cgit/cgit.css /var/lib/git/www/cgit.css
+ln -s /usr/share/cgit/robots.txt /var/lib/git/www/robots.txt
+
+log "configure shell accounts"
+adduser --uid 1000 --disabled-password --gecos "" jodersky 
+
+log "restart services"
+systemctl restart nginx
+
+log "configuration complete!"
