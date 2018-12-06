@@ -40,8 +40,10 @@ resource "acme_certificate" "certificate" {
   common_name     = "crashbox.io"
 
   subject_alternative_names = [
+    "www.crashbox.io",
     "ip.crashbox.io",
     "git.crashbox.io",
+    "dl.crashbox.io",
   ]
 
   dns_challenge {
@@ -67,51 +69,30 @@ resource "cloudflare_record" "record_caa" {
   type = "CAA"
 }
 
-resource "random_id" "peter" {
-  prefix      = "peter-"
-  byte_length = 2
-}
-
 resource "hcloud_server" "peter" {
-  name        = "${random_id.peter.hex}"
+  name        = "peter"
   image       = "debian-9"
   server_type = "cx11"
   location    = "nbg1"
   ssh_keys    = ["${hcloud_ssh_key.root.name}"]
-
-  provisioner "file" {
-    content     = "${acme_certificate.certificate.private_key_pem}"
-    destination = "/etc/ssl/private/server.key.pem"
-  }
-
-  provisioner "file" {
-    content     = "${acme_certificate.certificate.certificate_pem}"
-    destination = "/etc/ssl/server.cert.pem"
-  }
-
-  provisioner "file" {
-    content     = "${acme_certificate.certificate.issuer_pem}"
-    destination = "/etc/ssl/issuer.cert.pem"
-  }
-
-  provisioner "file" {
-    source      = "./provision"
-    destination = "/usr/local/share/"
-  }
-
-  provisioner "remote-exec" {
-    inline = [
-      "chmod +x /usr/local/share/provision/provision",
-      "/usr/local/share/provision/provision --force",
-    ]
-  }
 }
 
-module "peter_mount_volume" {
-  source      = "./mount_volume"
-  volume_name = "master"
-  host        = "${hcloud_server.peter.ipv4_address}"
-  server_id   = "${hcloud_server.peter.id}"
+# volumes contain persistent storage and thus need to be initialized
+# manually
+data "hcloud_volume" "master" {
+  name = "master"
+}
+
+# note that this module not idempotent: a second application requires
+# destroying the server resource first
+module "peter_provision" {
+  source                 = "./mount_and_provision"
+  host                   = "${hcloud_server.peter.ipv4_address}"
+  server_id              = "${hcloud_server.peter.id}"
+  volume_id              = "${data.hcloud_volume.master.id}"
+  tls_private_key        = "${acme_certificate.certificate.private_key_pem}"
+  tls_certificate        = "${acme_certificate.certificate.certificate_pem}"
+  tls_issuer_certificate = "${acme_certificate.certificate.issuer_pem}"
 }
 
 resource "cloudflare_record" "peter_a" {
@@ -128,6 +109,13 @@ resource "cloudflare_record" "peter_aaaa" {
   type   = "AAAA"
 }
 
+resource "cloudflare_record" "record_www" {
+  domain = "crashbox.io"
+  name   = "www"
+  value  = "${cloudflare_record.peter_a.hostname}"
+  type   = "CNAME"
+}
+
 resource "cloudflare_record" "record_ip" {
   domain = "crashbox.io"
   name   = "ip"
@@ -140,4 +128,18 @@ resource "cloudflare_record" "record_git" {
   name   = "git"
   value  = "${cloudflare_record.peter_a.hostname}"
   type   = "CNAME"
+}
+
+resource "cloudflare_record" "record_a" {
+  domain = "crashbox.io"
+  name   = "@"
+  value  = "${hcloud_server.peter.ipv4_address}"
+  type   = "A"
+}
+
+resource "cloudflare_record" "record_aaaa" {
+  domain = "crashbox.io"
+  name   = "@"
+  value  = "${hcloud_server.peter.ipv6_address}1"
+  type   = "AAAA"
 }
