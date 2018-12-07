@@ -143,3 +143,10 @@ resource "cloudflare_record" "record_aaaa" {
   value  = "${hcloud_server.peter.ipv6_address}1"
   type   = "AAAA"
 }
+
+resource "cloudflare_record" "record_keybase" {
+  domain = "crashbox.io"
+  name   = "@"
+  value  = "keybase-site-verification=useVUuHjr-ZoYdIDjzv1JngSiIoHYoGmXHy2BxJcYgE"
+  type   = "TXT"
+}
