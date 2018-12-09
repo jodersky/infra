@@ -150,3 +150,12 @@ resource "cloudflare_record" "record_keybase" {
   value  = "keybase-site-verification=useVUuHjr-ZoYdIDjzv1JngSiIoHYoGmXHy2BxJcYgE"
   type   = "TXT"
 }
+
+module "email" {
+  source                  = "./modules/email"
+  secret_cloudflare_token = "${var.secret_cloudflare_token}"
+  server_ipv4             = "${hcloud_server.peter.ipv4_address}"
+  server_ipv6             = "${hcloud_server.peter.ipv6_address}1"
+  server_id               = "${hcloud_server.peter.id}"
+  domain                  = "crashbox.io"
+}
