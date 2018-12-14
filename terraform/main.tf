@@ -1,18 +1,18 @@
-variable "secret_hcloud_token" {
-  type = "string"
+data "pass_password" "secret_hcloud_token" {
+  path = "infra/hcloud-token"
 }
 
-variable "secret_cloudflare_token" {
-  type = "string"
+data "pass_password" "secret_cloudflare_token" {
+  path = "infra/cloudflare-token"
 }
 
 provider "hcloud" {
-  token = "${var.secret_hcloud_token}"
+  token = "${data.pass_password.secret_hcloud_token.password}"
 }
 
 provider "cloudflare" {
   email = "jakob@odersky.com"
-  token = "${var.secret_cloudflare_token}"
+  token = "${data.pass_password.secret_cloudflare_token.password}"
 }
 
 provider "acme" {
@@ -51,7 +51,7 @@ resource "acme_certificate" "certificate" {
 
     config {
       CLOUDFLARE_EMAIL   = "jakob@odersky.com"
-      CLOUDFLARE_API_KEY = "${var.secret_cloudflare_token}"
+      CLOUDFLARE_API_KEY = "${data.pass_password.secret_cloudflare_token.password}"
     }
   }
 }
@@ -130,6 +130,13 @@ resource "cloudflare_record" "record_git" {
   type   = "CNAME"
 }
 
+resource "cloudflare_record" "record_dl" {
+  domain = "crashbox.io"
+  name   = "dl"
+  value  = "${cloudflare_record.peter_a.hostname}"
+  type   = "CNAME"
+}
+
 resource "cloudflare_record" "record_a" {
   domain = "crashbox.io"
   name   = "@"
@@ -153,7 +160,7 @@ resource "cloudflare_record" "record_keybase" {
 
 module "email" {
   source                  = "./modules/email"
-  secret_cloudflare_token = "${var.secret_cloudflare_token}"
+  secret_cloudflare_token = "${data.pass_password.secret_cloudflare_token.password}"
   server_ipv4             = "${hcloud_server.peter.ipv4_address}"
   server_ipv6             = "${hcloud_server.peter.ipv6_address}1"
   server_id               = "${hcloud_server.peter.id}"
